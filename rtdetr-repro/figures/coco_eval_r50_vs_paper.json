@@ -1,0 +1,13 @@
+{
+  "model": "RT-DETR-R50",
+  "dataset": "COCO val2017 (5000 images)",
+  "paper": {
+    "AP": 53.1, "AP50": 71.3, "AP75": 57.7, "APs": 34.8, "APm": 58.0, "APl": 70.0
+  },
+  "reproduced": {
+    "AP": 53.1, "AP50": 71.2, "AP75": 57.7, "APs": 34.7, "APm": 57.7, "APl": 70.1
+  },
+  "paper_source": "RT-DETR paper, Table 2 (RT-DETR-R50, 640x640)",
+  "repro_tool": "pycocotools via official tools/train.py --test-only",
+  "repro_env": "RTX 3060 Laptop, torch 2.12.0+cu132, FP32, 1.48GB GPU mem, 6m21s"
+}

@@ -1,0 +1,28 @@
+{
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "torch": "2.12.0+cu132",
+  "input": "1x3x640x640",
+  "note": "PyTorch inference, batch=1, w/o TensorRT",
+  "models": {
+    "rtdetr_r50vd": {
+      "fp32": {
+        "ms_per_image": 41.06,
+        "fps": 24.4
+      },
+      "fp16": {
+        "ms_per_image": 50.23,
+        "fps": 19.9
+      }
+    },
+    "rtdetr_r18vd": {
+      "fp32": {
+        "ms_per_image": 20.14,
+        "fps": 49.6
+      },
+      "fp16": {
+        "ms_per_image": 27.48,
+        "fps": 36.4
+      }
+    }
+  }
+}

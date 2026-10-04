@@ -1,0 +1,123 @@
+diff --git a/rtdetr_pytorch/src/data/coco/coco_dataset.py b/rtdetr_pytorch/src/data/coco/coco_dataset.py
+index 0ef7849..993d2da 100644
+--- a/rtdetr_pytorch/src/data/coco/coco_dataset.py
++++ b/rtdetr_pytorch/src/data/coco/coco_dataset.py
+@@ -5,13 +5,22 @@ COCO dataset which returns image_id for evaluation.
+ Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references/detection/coco_utils.py
+ """
+ 
++import types
++
+ import torch
+ import torch.utils.data
+ 
+ import torchvision
+ torchvision.disable_beta_transforms_warning()
+ 
+-from torchvision import datapoints
++from torchvision import tv_tensors
++datapoints = types.SimpleNamespace(
++    Image=tv_tensors.Image,
++    Video=tv_tensors.Video,
++    Mask=tv_tensors.Mask,
++    BoundingBox=tv_tensors.BoundingBoxes,
++    BoundingBoxFormat=tv_tensors.BoundingBoxFormat,
++)
+ 
+ from pycocotools import mask as coco_mask
+ 
+@@ -45,7 +54,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
+             target['boxes'] = datapoints.BoundingBox(
+                 target['boxes'], 
+                 format=datapoints.BoundingBoxFormat.XYXY, 
+-                spatial_size=img.size[::-1]) # h w
++                canvas_size=img.size[::-1]) # h w
+ 
+         if 'masks' in target:
+             target['masks'] = datapoints.Mask(target['masks'])
+diff --git a/rtdetr_pytorch/src/data/transforms.py b/rtdetr_pytorch/src/data/transforms.py
+index 13f469e..ff4c82a 100644
+--- a/rtdetr_pytorch/src/data/transforms.py
++++ b/rtdetr_pytorch/src/data/transforms.py
+@@ -2,12 +2,22 @@
+ """
+ 
+ 
++import types
++
+ import torch 
+ import torch.nn as nn 
+ 
+ import torchvision
+ torchvision.disable_beta_transforms_warning()
+-from torchvision import datapoints
++
++from torchvision import tv_tensors
++datapoints = types.SimpleNamespace(
++    Image=tv_tensors.Image,
++    Video=tv_tensors.Video,
++    Mask=tv_tensors.Mask,
++    BoundingBox=tv_tensors.BoundingBoxes,
++    BoundingBoxFormat=tv_tensors.BoundingBoxFormat,
++)
+ 
+ import torchvision.transforms.v2 as T
+ import torchvision.transforms.v2.functional as F
+@@ -26,9 +36,28 @@ RandomZoomOut = register(T.RandomZoomOut)
+ # RandomIoUCrop = register(T.RandomIoUCrop)
+ RandomHorizontalFlip = register(T.RandomHorizontalFlip)
+ Resize = register(T.Resize)
+-ToImageTensor = register(T.ToImageTensor)
+-ConvertDtype = register(T.ConvertDtype)
+-SanitizeBoundingBox = register(T.SanitizeBoundingBox)
++
++if hasattr(T, 'ToImageTensor'):
++    ToImageTensor = register(T.ToImageTensor)
++else:
++    class ToImageTensor(T.ToImage):
++        pass
++    ToImageTensor = register(ToImageTensor)
++
++if hasattr(T, 'ConvertDtype'):
++    ConvertDtype = register(T.ConvertDtype)
++else:
++    class ConvertDtype(T.ToDtype):
++        def __init__(self, scale=True, dtype=torch.float32):
++            super().__init__(dtype=dtype, scale=scale)
++    ConvertDtype = register(ConvertDtype)
++
++if hasattr(T, 'SanitizeBoundingBox'):
++    SanitizeBoundingBox = register(T.SanitizeBoundingBox)
++else:
++    class SanitizeBoundingBox(T.SanitizeBoundingBoxes):
++        pass
++    SanitizeBoundingBox = register(SanitizeBoundingBox)
+ RandomCrop = register(T.RandomCrop)
+ Normalize = register(T.Normalize)
+ 
+@@ -76,7 +105,7 @@ class PadToSize(T.Pad):
+         datapoints.BoundingBox,
+     )
+     def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
+-        sz = F.get_spatial_size(flat_inputs[0])
++        sz = flat_inputs[0].shape[-2:]
+         h, w = self.spatial_size[0] - sz[0], self.spatial_size[1] - sz[1]
+         self.padding = [0, 0, w, h]
+         return dict(padding=self.padding)
+@@ -136,13 +165,13 @@ class ConvertBox(T.Transform):
+ 
+     def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:  
+         if self.out_fmt:
+-            spatial_size = inpt.spatial_size
++            spatial_size = inpt.canvas_size
+             in_fmt = inpt.format.value.lower()
+             inpt = torchvision.ops.box_convert(inpt, in_fmt=in_fmt, out_fmt=self.out_fmt)
+-            inpt = datapoints.BoundingBox(inpt, format=self.data_fmt[self.out_fmt], spatial_size=spatial_size)
++            inpt = datapoints.BoundingBox(inpt, format=self.data_fmt[self.out_fmt], canvas_size=spatial_size)
+         
+         if self.normalize:
+-            inpt = inpt / torch.tensor(inpt.spatial_size[::-1]).tile(2)[None]
++            inpt = inpt / torch.tensor(inpt.canvas_size[::-1]).tile(2)[None]
+ 
+         return inpt
+ 
